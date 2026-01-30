@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL Shortener</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+</head>
+<body>
+    <main class="container">
+        <h1>URL Shortener</h1>
+        <article>
+            <h2>Create Short Link</h2>
+            <form id="createForm">
+                <label for="url">
+                    URL
+                    <input type="url" id="url" name="url" placeholder="https://example.com" required>
+                </label>
+                <label for="code">
+                    Custom Code (optional)
+                    <input type="text" id="code" name="code" placeholder="my-link">
+                </label>
+                <label for="expiry">
+                    Expiry
+                    <select id="expiry" name="expiry">
+                        <option value="1d">1 Day</option>
+                        <option value="7d">7 Days</option>
+                    </select>
+                </label>
+                <button type="submit">Shorten</button>
+            </form>
+            <div id="result" style="display:none;">
+                <p><strong>Short URL:</strong> <a id="shortUrl" href="" target="_blank"></a></p>
+                <button onclick="copyToClipboard()">Copy</button>
+            </div>
+        </article>
+        <footer>
+            <p><a href="/admin">Admin Login</a></p>
+        </footer>
+    </main>
+
+    <script>
+        document.getElementById('createForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = {
+                url: formData.get('url'),
+                code: formData.get('code'),
+                expiry: formData.get('expiry')
+            };
+
+            try {
+                const response = await fetch('/api/public/routes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    alert('Error: ' + error);
+                    return;
+                }
+
+                const result = await response.json();
+                const shortUrl = window.location.origin + '/' + result.code;
+                document.getElementById('shortUrl').href = shortUrl;
+                document.getElementById('shortUrl').textContent = shortUrl;
+                document.getElementById('result').style.display = 'block';
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        });
+
+        function copyToClipboard() {
+            const url = document.getElementById('shortUrl').textContent;
+            navigator.clipboard.writeText(url).then(() => {
+                alert('Copied to clipboard!');
+            });
+        }
+    </script>
+</body>
+</html>
