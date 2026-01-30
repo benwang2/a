@@ -1,11 +1,14 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"log"
-	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -65,6 +68,7 @@ var (
 		"went", "were", "west", "what", "when", "wide", "will", "wind", "wish", "with",
 		"word", "work", "world", "year", "your",
 	}
+	codePattern = regexp.MustCompile(`^[a-zA-Z0-9-]{1,50}$`)
 )
 
 func main() {
@@ -77,6 +81,7 @@ func main() {
 	sessionKey := os.Getenv("SESSION_KEY")
 	if sessionKey == "" {
 		sessionKey = "change-me-in-production"
+		log.Println("WARNING: Using default SESSION_KEY. Set SESSION_KEY environment variable in production!")
 	}
 
 	app := &App{
@@ -96,8 +101,8 @@ func main() {
 			Scopes:       []string{"user:email"},
 			Endpoint:     github.Endpoint,
 		},
-		allowedDomains:     strings.Split(os.Getenv("ALLOWED_DOMAINS"), ","),
-		allowedGithubUsers: strings.Split(os.Getenv("ALLOWED_GITHUB_USERS"), ","),
+		allowedDomains:     filterEmpty(strings.Split(os.Getenv("ALLOWED_DOMAINS"), ",")),
+		allowedGithubUsers: filterEmpty(strings.Split(os.Getenv("ALLOWED_GITHUB_USERS"), ",")),
 	}
 
 	r := mux.NewRouter()
@@ -141,6 +146,66 @@ func main() {
 	log.Fatal(http.ListenAndServe(":"+port, r))
 }
 
+func filterEmpty(strs []string) []string {
+	var result []string
+	for _, s := range strs {
+		if s != "" {
+			result = append(result, s)
+		}
+	}
+	return result
+}
+
+func validateURL(urlStr string) error {
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return err
+	}
+	
+	scheme := strings.ToLower(parsedURL.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return &url.Error{Op: "parse", URL: urlStr, Err: http.ErrNotSupported}
+	}
+	
+	return nil
+}
+
+func validateCode(code string) error {
+	if !codePattern.MatchString(code) {
+		return &url.Error{Op: "validate", URL: code, Err: http.ErrNotSupported}
+	}
+	return nil
+}
+
+func getExpiryDuration(expiry string, isAdmin bool) (time.Duration, error) {
+	switch expiry {
+	case "", "1d":
+		return 24 * time.Hour, nil
+	case "7d":
+		return 7 * 24 * time.Hour, nil
+	case "30d":
+		if !isAdmin {
+			return 0, &url.Error{Op: "expiry", URL: expiry, Err: http.ErrNotSupported}
+		}
+		return 30 * 24 * time.Hour, nil
+	case "perma":
+		if !isAdmin {
+			return 0, &url.Error{Op: "expiry", URL: expiry, Err: http.ErrNotSupported}
+		}
+		return 100 * 365 * 24 * time.Hour, nil
+	default:
+		return 0, &url.Error{Op: "expiry", URL: expiry, Err: http.ErrNotSupported}
+	}
+}
+
+func generateRandomState() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
 func (app *App) createPublicRoute(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		URL    string `json:"url"`
@@ -158,14 +223,15 @@ func (app *App) createPublicRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
+	// Validate URL
+	if err := validateURL(req.URL); err != nil {
+		http.Error(w, "Invalid URL: only http and https URLs are allowed", http.StatusBadRequest)
+		return
+	}
+	
 	// Validate expiry - only 1d or 7d allowed for public
-	var expiryDuration time.Duration
-	switch req.Expiry {
-	case "", "1d":
-		expiryDuration = 24 * time.Hour
-	case "7d":
-		expiryDuration = 7 * 24 * time.Hour
-	default:
+	expiryDuration, err := getExpiryDuration(req.Expiry, false)
+	if err != nil {
 		http.Error(w, "Invalid expiry, only 1d or 7d allowed for public routes", http.StatusBadRequest)
 		return
 	}
@@ -174,6 +240,10 @@ func (app *App) createPublicRoute(w http.ResponseWriter, r *http.Request) {
 	if code == "" {
 		code = app.generateCode()
 	} else {
+		if err := validateCode(code); err != nil {
+			http.Error(w, "Invalid code: only alphanumeric characters and hyphens allowed (1-50 chars)", http.StatusBadRequest)
+			return
+		}
 		if reservedCodes[code] {
 			http.Error(w, "Code is reserved", http.StatusBadRequest)
 			return
@@ -225,7 +295,9 @@ func (app *App) redirectHandler(w http.ResponseWriter, r *http.Request) {
 	// Update usage stats
 	route.Uses++
 	route.LastAccess = time.Now()
-	app.saveRoute(route)
+	if err := app.saveRoute(route); err != nil {
+		log.Printf("Failed to update route stats for %s: %v", code, err)
+	}
 	
 	http.Redirect(w, r, route.URL, http.StatusFound)
 }
@@ -268,17 +340,14 @@ func (app *App) createAdminRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	var expiryDuration time.Duration
-	switch req.Expiry {
-	case "", "1d":
-		expiryDuration = 24 * time.Hour
-	case "7d":
-		expiryDuration = 7 * 24 * time.Hour
-	case "30d":
-		expiryDuration = 30 * 24 * time.Hour
-	case "perma":
-		expiryDuration = 100 * 365 * 24 * time.Hour // 100 years
-	default:
+	// Validate URL
+	if err := validateURL(req.URL); err != nil {
+		http.Error(w, "Invalid URL: only http and https URLs are allowed", http.StatusBadRequest)
+		return
+	}
+	
+	expiryDuration, err := getExpiryDuration(req.Expiry, true)
+	if err != nil {
 		http.Error(w, "Invalid expiry", http.StatusBadRequest)
 		return
 	}
@@ -287,6 +356,10 @@ func (app *App) createAdminRoute(w http.ResponseWriter, r *http.Request) {
 	if code == "" {
 		code = app.generateCode()
 	} else {
+		if err := validateCode(code); err != nil {
+			http.Error(w, "Invalid code: only alphanumeric characters and hyphens allowed (1-50 chars)", http.StatusBadRequest)
+			return
+		}
 		if reservedCodes[code] {
 			http.Error(w, "Code is reserved", http.StatusBadRequest)
 			return
@@ -334,21 +407,16 @@ func (app *App) updateRoute(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	if req.URL != "" {
+		if err := validateURL(req.URL); err != nil {
+			http.Error(w, "Invalid URL: only http and https URLs are allowed", http.StatusBadRequest)
+			return
+		}
 		route.URL = req.URL
 	}
 	
 	if req.Expiry != "" {
-		var expiryDuration time.Duration
-		switch req.Expiry {
-		case "1d":
-			expiryDuration = 24 * time.Hour
-		case "7d":
-			expiryDuration = 7 * 24 * time.Hour
-		case "30d":
-			expiryDuration = 30 * 24 * time.Hour
-		case "perma":
-			expiryDuration = 100 * 365 * 24 * time.Hour
-		default:
+		expiryDuration, err := getExpiryDuration(req.Expiry, true)
+		if err != nil {
 			http.Error(w, "Invalid expiry", http.StatusBadRequest)
 			return
 		}
@@ -378,7 +446,12 @@ func (app *App) deleteRoute(w http.ResponseWriter, r *http.Request) {
 
 func (app *App) generateCode() string {
 	for {
-		code := wordList[rand.Intn(len(wordList))]
+		// Use crypto/rand for secure random selection
+		b := make([]byte, 1)
+		rand.Read(b)
+		idx := int(b[0]) % len(wordList)
+		code := wordList[idx]
+		
 		if !reservedCodes[code] && !app.codeExists(code) {
 			return code
 		}
@@ -420,11 +493,34 @@ func (app *App) saveRoute(route Route) error {
 
 // OAuth handlers
 func (app *App) googleLogin(w http.ResponseWriter, r *http.Request) {
-	url := app.googleOAuth.AuthCodeURL("state", oauth2.AccessTypeOffline)
+	state, err := generateRandomState()
+	if err != nil {
+		http.Error(w, "Failed to generate state", http.StatusInternalServerError)
+		return
+	}
+	
+	session, _ := app.sessionStore.Get(r, "auth-session")
+	session.Values["oauth-state"] = state
+	if err := session.Save(r, w); err != nil {
+		http.Error(w, "Failed to save session", http.StatusInternalServerError)
+		return
+	}
+	
+	url := app.googleOAuth.AuthCodeURL(state, oauth2.AccessTypeOffline)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
 func (app *App) googleCallback(w http.ResponseWriter, r *http.Request) {
+	session, _ := app.sessionStore.Get(r, "auth-session")
+	
+	// Verify state parameter
+	state := r.URL.Query().Get("state")
+	savedState, ok := session.Values["oauth-state"].(string)
+	if !ok || state != savedState {
+		http.Error(w, "Invalid state parameter", http.StatusBadRequest)
+		return
+	}
+	
 	code := r.URL.Query().Get("code")
 	token, err := app.googleOAuth.Exchange(r.Context(), code)
 	if err != nil {
@@ -451,7 +547,7 @@ func (app *App) googleCallback(w http.ResponseWriter, r *http.Request) {
 	// Check if email domain is allowed
 	allowed := false
 	for _, domain := range app.allowedDomains {
-		if domain != "" && strings.HasSuffix(userInfo.Email, "@"+domain) {
+		if strings.HasSuffix(userInfo.Email, "@"+domain) {
 			allowed = true
 			break
 		}
@@ -462,20 +558,46 @@ func (app *App) googleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	session, _ := app.sessionStore.Get(r, "auth-session")
 	session.Values["authenticated"] = true
 	session.Values["email"] = userInfo.Email
-	session.Save(r, w)
+	delete(session.Values, "oauth-state")
+	if err := session.Save(r, w); err != nil {
+		http.Error(w, "Failed to save session", http.StatusInternalServerError)
+		return
+	}
 	
 	http.Redirect(w, r, "/admin", http.StatusFound)
 }
 
 func (app *App) githubLogin(w http.ResponseWriter, r *http.Request) {
-	url := app.githubOAuth.AuthCodeURL("state", oauth2.AccessTypeOffline)
+	state, err := generateRandomState()
+	if err != nil {
+		http.Error(w, "Failed to generate state", http.StatusInternalServerError)
+		return
+	}
+	
+	session, _ := app.sessionStore.Get(r, "auth-session")
+	session.Values["oauth-state"] = state
+	if err := session.Save(r, w); err != nil {
+		http.Error(w, "Failed to save session", http.StatusInternalServerError)
+		return
+	}
+	
+	url := app.githubOAuth.AuthCodeURL(state, oauth2.AccessTypeOffline)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
 func (app *App) githubCallback(w http.ResponseWriter, r *http.Request) {
+	session, _ := app.sessionStore.Get(r, "auth-session")
+	
+	// Verify state parameter
+	state := r.URL.Query().Get("state")
+	savedState, ok := session.Values["oauth-state"].(string)
+	if !ok || state != savedState {
+		http.Error(w, "Invalid state parameter", http.StatusBadRequest)
+		return
+	}
+	
 	code := r.URL.Query().Get("code")
 	token, err := app.githubOAuth.Exchange(r.Context(), code)
 	if err != nil {
@@ -502,7 +624,7 @@ func (app *App) githubCallback(w http.ResponseWriter, r *http.Request) {
 	// Check if GitHub username is allowed
 	allowed := false
 	for _, username := range app.allowedGithubUsers {
-		if username != "" && username == userInfo.Login {
+		if username == userInfo.Login {
 			allowed = true
 			break
 		}
@@ -513,10 +635,13 @@ func (app *App) githubCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	session, _ := app.sessionStore.Get(r, "auth-session")
 	session.Values["authenticated"] = true
 	session.Values["username"] = userInfo.Login
-	session.Save(r, w)
+	delete(session.Values, "oauth-state")
+	if err := session.Save(r, w); err != nil {
+		http.Error(w, "Failed to save session", http.StatusInternalServerError)
+		return
+	}
 	
 	http.Redirect(w, r, "/admin", http.StatusFound)
 }
@@ -524,7 +649,9 @@ func (app *App) githubCallback(w http.ResponseWriter, r *http.Request) {
 func (app *App) logout(w http.ResponseWriter, r *http.Request) {
 	session, _ := app.sessionStore.Get(r, "auth-session")
 	session.Values["authenticated"] = false
-	session.Save(r, w)
+	if err := session.Save(r, w); err != nil {
+		log.Printf("Failed to save session during logout: %v", err)
+	}
 	
 	http.Redirect(w, r, "/", http.StatusFound)
 }
