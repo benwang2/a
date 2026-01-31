@@ -1,5 +1,8 @@
 version: '3'
 
+vars:
+  BACKEND_BIN: ./bin/url-shortener.exe
+
 tasks:
   default:
     desc: Build both frontend and backend
@@ -36,13 +39,13 @@ tasks:
   build:backend:
     desc: Build Go backend
     cmds:
-      - go build -o url-shortener
+      - go build -o {{.BACKEND_BIN}}
     sources:
       - '*.go'
       - go.mod
       - go.sum
     generates:
-      - url-shortener
+      - "{{.BACKEND_BIN}}"
 
   dev:
     desc: Run frontend dev server (backend must be run separately)
@@ -82,4 +85,4 @@ tasks:
     desc: Run the application
     deps: [build]
     cmds:
-      - ./url-shortener
+      - "{{.BACKEND_BIN}}"
