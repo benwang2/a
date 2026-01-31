@@ -246,7 +246,10 @@ func (app *App) generateCode() string {
 	for {
 		// Use crypto/rand for secure random selection
 		b := make([]byte, 1)
-		rand.Read(b)
+		if _, err := rand.Read(b); err != nil {
+			// Fallback to timestamp-based selection if crypto/rand fails
+			b[0] = byte(time.Now().UnixNano() % 256)
+		}
 		idx := int(b[0]) % len(wordList)
 		code := wordList[idx]
 		
