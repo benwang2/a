@@ -46,7 +46,7 @@ func (app *App) googleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	client := app.googleOAuth.Client(r.Context(), token)
-	resp, err := client.Get("https://www.googleapis.com/auth/userinfo.email")
+	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
 	if err != nil {
 		http.Error(w, "Failed to get user info", http.StatusInternalServerError)
 		return
