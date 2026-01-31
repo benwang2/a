@@ -6,6 +6,7 @@ require (
 	github.com/cockroachdb/pebble v1.1.5
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/sessions v1.4.0
+	github.com/joho/godotenv v1.5.1
 	golang.org/x/oauth2 v0.34.0
 )
 
@@ -24,7 +25,6 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
-	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/klauspost/compress v1.16.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
