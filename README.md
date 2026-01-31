@@ -37,24 +37,32 @@ A URL shortener built with Go, Pebble database, Preact, and Pico CSS.
 
 3. Update `.env` with your OAuth credentials and allowlists
 
-4. Install dependencies:
+4. Build frontend:
+   ```bash
+   cd frontend
+   npm install
+   npm run build
+   cd ..
+   ```
+
+5. Install Go dependencies:
    ```bash
    go mod download
    ```
 
-5. Run the server:
+6. Run the server:
    ```bash
-   go run main.go
+   go run *.go
    ```
 
-6. Access the application:
+7. Access the application:
    - Public interface: http://localhost:8080
    - Admin dashboard: http://localhost:8080/admin
 
 ## API Endpoints
 
 ### Public
-- `POST /api/public/routes` - Create a short link
+- `POST /api/routes` - Create a short link
   ```json
   {
     "url": "https://example.com",
@@ -64,22 +72,22 @@ A URL shortener built with Go, Pebble database, Preact, and Pico CSS.
   ```
 
 ### Admin (Requires Authentication)
-- `GET /api/admin/routes` - List all routes
-- `POST /api/admin/routes` - Create a route
+- `GET /api/routes` - List all routes
+- `POST /api/routes` - Create a route
   ```json
   {
     "url": "https://example.com",
     "code": "optional-custom-code",
-    "expiry": "1d"  // "1d", "7d", "30d", or "perma"
+    "expiry": "1d"  // "1d", "7d", "30d", "365d", or "perma"
   }
   ```
-- `PUT /api/admin/routes/{code}` - Update a route
-- `DELETE /api/admin/routes/{code}` - Delete a route
+- `PUT /api/routes/{code}` - Update a route
+- `DELETE /api/routes/{code}` - Delete a route
 
 ## Technology Stack
 
 - **Backend**: Go with Gorilla Mux for routing
 - **Database**: Pebble (embedded key-value store)
-- **Frontend**: Preact with HTM
+- **Frontend**: Preact with TypeScript, built with Vite
 - **Styling**: Pico CSS
 - **Authentication**: OAuth 2.0 (Google & GitHub)

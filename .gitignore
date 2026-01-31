@@ -2,3 +2,9 @@ data/
 *.db
 .env
 url-shortener
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+static/assets/
+static/*.html
