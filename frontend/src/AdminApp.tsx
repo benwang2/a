@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'preact/hooks';
-import './styles.css';
 
 interface Route {
   code: string;
