@@ -45,7 +45,7 @@ tasks:
       - url-shortener
 
   dev:
-    desc: Run development server with hot reload
+    desc: Run frontend dev server (backend must be run separately)
     deps: [dev:frontend]
 
   dev:frontend:
@@ -60,13 +60,18 @@ tasks:
       - go run *.go
 
   clean:
-    desc: Clean build artifacts
+    desc: Clean build artifacts (keeps dependencies)
     cmds:
       - rm -f url-shortener
-      - rm -rf frontend/node_modules
       - rm -rf frontend/dist
       - rm -rf static/assets
       - rm -f static/*.html
+
+  clean:all:
+    desc: Clean everything including dependencies
+    cmds:
+      - task: clean
+      - rm -rf frontend/node_modules
 
   test:
     desc: Run tests

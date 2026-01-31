@@ -42,7 +42,7 @@ A URL shortener built with Go, Pebble database, Preact, and Pico CSS.
    # macOS
    brew install go-task/tap/go-task
    
-   # Linux
+   # Linux (verify script before running: https://taskfile.dev/installation/)
    sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
    
    # Or using Go
@@ -79,7 +79,8 @@ Run `task --list` to see all available tasks:
 - `task install` - Install all dependencies
 - `task dev:frontend` - Run Vite dev server with hot reload
 - `task dev:backend` - Run Go backend in development mode
-- `task clean` - Clean all build artifacts
+- `task clean` - Clean build artifacts (keeps dependencies)
+- `task clean:all` - Clean everything including node_modules
 - `task test` - Run tests
 - `task run` - Build and run the application
 
