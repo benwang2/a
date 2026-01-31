@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
+import './styles.css';
 
 interface Route {
   code: string;
@@ -35,7 +36,7 @@ export function AdminApp() {
       const response = await fetch('/api/routes');
       if (!response.ok) {
         if (response.status === 401) {
-          window.location.href = '/auth/google';
+          window.location.href = '/login';
           return;
         }
         throw new Error('Failed to load routes');

@@ -97,6 +97,9 @@ func main() {
 	r.HandleFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "static/admin.html")
 	}).Methods("GET")
+	r.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "static/login.html")
+	}).Methods("GET")
 	r.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.Dir("static/assets"))))
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
