@@ -37,27 +37,51 @@ A URL shortener built with Go, Pebble database, Preact, and Pico CSS.
 
 3. Update `.env` with your OAuth credentials and allowlists
 
-4. Build frontend:
+4. Install Task (if not already installed):
    ```bash
-   cd frontend
-   npm install
-   npm run build
-   cd ..
+   # macOS
+   brew install go-task/tap/go-task
+   
+   # Linux
+   sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
+   
+   # Or using Go
+   go install github.com/go-task/task/v3/cmd/task@latest
    ```
 
-5. Install Go dependencies:
+5. Build and run:
    ```bash
-   go mod download
+   # Install dependencies and build
+   task build
+   
+   # Or run directly
+   task run
    ```
 
-6. Run the server:
+6. Development mode:
    ```bash
-   go run *.go
+   # Run frontend dev server (with hot reload)
+   task dev:frontend
+   
+   # In another terminal, run backend
+   task dev:backend
    ```
 
 7. Access the application:
    - Public interface: http://localhost:8080
    - Admin dashboard: http://localhost:8080/admin
+
+## Available Tasks
+
+Run `task --list` to see all available tasks:
+
+- `task build` - Build both frontend and backend
+- `task install` - Install all dependencies
+- `task dev:frontend` - Run Vite dev server with hot reload
+- `task dev:backend` - Run Go backend in development mode
+- `task clean` - Clean all build artifacts
+- `task test` - Run tests
+- `task run` - Build and run the application
 
 ## API Endpoints
 
@@ -91,3 +115,4 @@ A URL shortener built with Go, Pebble database, Preact, and Pico CSS.
 - **Frontend**: Preact with TypeScript, built with Vite
 - **Styling**: Pico CSS
 - **Authentication**: OAuth 2.0 (Google & GitHub)
+- **Build Tool**: Task (Taskfile)

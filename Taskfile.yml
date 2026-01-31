@@ -1,0 +1,80 @@
+version: '3'
+
+tasks:
+  default:
+    desc: Build both frontend and backend
+    cmds:
+      - task: build
+
+  install:
+    desc: Install all dependencies
+    cmds:
+      - task: install:frontend
+      - task: install:backend
+
+  install:frontend:
+    desc: Install frontend dependencies
+    dir: frontend
+    cmds:
+      - npm install
+
+  install:backend:
+    desc: Install backend dependencies
+    cmds:
+      - go mod download
+
+  build:
+    desc: Build both frontend and backend
+    deps: [build:frontend, build:backend]
+
+  build:frontend:
+    desc: Build frontend with Vite
+    dir: frontend
+    cmds:
+      - npm run build
+
+  build:backend:
+    desc: Build Go backend
+    cmds:
+      - go build -o url-shortener
+    sources:
+      - '*.go'
+      - go.mod
+      - go.sum
+    generates:
+      - url-shortener
+
+  dev:
+    desc: Run development server with hot reload
+    deps: [dev:frontend]
+
+  dev:frontend:
+    desc: Run Vite dev server
+    dir: frontend
+    cmds:
+      - npm run dev
+
+  dev:backend:
+    desc: Run Go backend in development mode
+    cmds:
+      - go run *.go
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -f url-shortener
+      - rm -rf frontend/node_modules
+      - rm -rf frontend/dist
+      - rm -rf static/assets
+      - rm -f static/*.html
+
+  test:
+    desc: Run tests
+    cmds:
+      - go test -v ./...
+
+  run:
+    desc: Run the application
+    deps: [build]
+    cmds:
+      - ./url-shortener
