@@ -10,6 +10,7 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
+	"github.com/joho/godotenv"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
 	"golang.org/x/oauth2/google"
@@ -28,6 +29,9 @@ var wordList []string
 
 func main() {
 	// Load word list from JSON file
+
+	err := godotenv.Load()
+
 	wordData, err := os.ReadFile("words.json")
 	if err != nil {
 		log.Fatal("Failed to load words.json:", err)
