@@ -73,7 +73,10 @@ export function App() {
 
   return (
     <main className="container">
-      <h1>URL Shortener</h1>
+      <div className="top-nav">
+        <h1>URL Shortener</h1>
+        <a href="/login" role="button" className="login-btn">Login</a>
+      </div>
       <article>
         <h2>Create Short Link</h2>
         <form onSubmit={handleSubmit}>
@@ -134,11 +137,6 @@ export function App() {
           </div>
         )}
       </article>
-      <footer>
-        <p>
-          <a href="/admin">Admin Login</a>
-        </p>
-      </footer>
     </main>
   );
 }
